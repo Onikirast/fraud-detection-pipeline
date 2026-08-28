@@ -135,6 +135,38 @@ def rule_category_novelty(profile: dict, category: str):
 
 
 def rule_velocity(engine, user_id: str, timestamp):
+    """Flags a user for exceeding VELOCITY_MAX_TXNS transactions in the
+    rolling VELOCITY_WINDOW_MINUTES window -- but only on the transaction
+    that FIRST pushes the window over the limit, not every subsequent one
+    while the window stays busy.
+
+    Without this, a single burst of N over-limit transactions produces N
+    flagged events (one per transaction), and a normal busy minute that
+    happens to sit above the threshold keeps re-flagging every transaction
+    for as long as it stays there -- "alert flapping." See BUILD_LOG.md.
+
+    `count` includes this transaction itself (it's already been inserted
+    by the time this runs). `count - 1` is therefore the count of every
+    *other* transaction from this user inside the exact same window --
+    i.e. "how full was this window without this new arrival?" If that was
+    already over the limit, this transaction is just one more on top of an
+    already-flagged streak, so we suppress it. If it wasn't, this
+    transaction is the one that tips the window over -- the crossing point
+    -- so we flag it.
+
+    Honest limitation: this is edge-detection against a single window
+    snapshot, not a fully stateful "armed/disarmed per user" hysteresis.
+    If the count oscillates right around the threshold (e.g. 9, 8, 9, 8...)
+    it can still re-flag more than once, because each check only looks at
+    "was the window full without me," not "has this user been continuously
+    over the limit since the last flag." A true zero-flap version would
+    need to persist per-user alert state (e.g. a `last_velocity_flag_at`
+    column) and only re-arm once the count has dropped back under the
+    limit for a full window's worth of time. Not implemented here because
+    it adds a stateful column for a problem this simpler stateless check
+    already solves for the case that mattered in practice: a burst no
+    longer produces 5-8 flagged events, it produces exactly 1.
+    """
     window_start = timestamp - timedelta(minutes=VELOCITY_WINDOW_MINUTES)
     with engine.connect() as conn:
         count = conn.execute(
@@ -147,9 +179,14 @@ def rule_velocity(engine, user_id: str, timestamp):
             {"uid": user_id, "window_start": window_start},
         ).scalar()
 
-    if count > VELOCITY_MAX_TXNS:
-        return True, f"{count} transactions in the last {VELOCITY_WINDOW_MINUTES} min (limit {VELOCITY_MAX_TXNS})"
-    return False, None
+    if count <= VELOCITY_MAX_TXNS:
+        return False, None
+
+    already_over_without_this_txn = (count - 1) > VELOCITY_MAX_TXNS
+    if already_over_without_this_txn:
+        return False, None  # part of a streak already flagged -- debounce
+
+    return True, f"{count} transactions in the last {VELOCITY_WINDOW_MINUTES} min (limit {VELOCITY_MAX_TXNS})"
 
 
 def update_profile(engine, profile: dict, amount: float, category: str):

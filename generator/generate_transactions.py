@@ -43,17 +43,31 @@ MERCHANT_CATEGORIES = [
 
 # A fixed pool of simulated users, each with their own baseline spending
 # profile, so the detection logic has consistent per-user history to learn.
+#
+# Each user's baseline_mean/baseline_stddev/home_categories is drawn from a
+# random.Random SEEDED BY THEIR user_id, not the shared global `random`
+# module. This makes those three fields identical every time the generator
+# is (re)started -- see BUILD_LOG.md. Without this, restarting the
+# generator reshuffled every user's "true" spending profile while their
+# accumulated history in Postgres stayed exactly as it was, so the very
+# next transaction for nearly every user looked wildly anomalous against a
+# baseline that no longer had anything to do with what was actually being
+# sent. `location` doesn't affect detection at all, so it's left drawing
+# from the shared Faker instance -- fine for it to vary between runs.
 NUM_USERS = 25
-USERS = [
-    {
-        "user_id": f"user_{i:03d}",
-        "baseline_mean": random.uniform(15, 200),
-        "baseline_stddev": random.uniform(5, 40),
-        "home_categories": random.sample(MERCHANT_CATEGORIES, k=3),
-        "location": fake.city(),
-    }
-    for i in range(NUM_USERS)
-]
+USERS = []
+for _i in range(NUM_USERS):
+    _user_id = f"user_{_i:03d}"
+    _rng = random.Random(_user_id)  # seeded by user_id -- stable across restarts
+    USERS.append(
+        {
+            "user_id": _user_id,
+            "baseline_mean": _rng.uniform(15, 200),
+            "baseline_stddev": _rng.uniform(5, 40),
+            "home_categories": _rng.sample(MERCHANT_CATEGORIES, k=3),
+            "location": fake.city(),
+        }
+    )
 
 ANOMALY_PROBABILITY = 0.05  # ~1 in 20 transactions is a deliberate anomaly
 

@@ -6,6 +6,20 @@ Each entry: what broke, why, how it was fixed, and what it taught us. Newest ent
 
 ---
 
+## Committed requirements.txt never actually got the kafka-python fix
+
+**Date:** 2026-09-05
+
+**What broke:** Running `pip install -r requirements.txt` into a freshly created venv for the first real end-to-end run installed `kafka-python==2.0.2` — the exact pre-fix version the "Local setup (Windows/WSL2)" entry below documents replacing weeks earlier, specifically because `2.0.2` breaks under Python 3.12 (`ModuleNotFoundError: No module named 'kafka.vendor.six.moves'`).
+
+**Root cause:** The version bump was made to the working file at the time, but that change never actually made it into the `requirements.txt` that got `git add`ed into the initial commit — the commit captured whatever was on disk at that moment, which turned out to still be the old pin. Nothing caught this until now because every phase up to this point was validated by exercising the generator/consumer logic directly (calling their functions in-process), never by installing dependencies fresh from `requirements.txt` into a clean venv and letting Python actually `import kafka` — precisely the gap the "still needs to be done on your machine" caveat in `README.md` existed to flag.
+
+**Fix:** Re-pinned `requirements.txt` to `kafka-python==2.3.2` and reinstalled. Verified `from kafka import KafkaProducer` imports cleanly under this venv's Python 3.12.
+
+**Takeaway for interviews:** A concrete example of why "I fixed it" and "the fix is actually in what ships" are two different claims — a change made to a live working file doesn't count as shipped until it's confirmed present in what actually gets committed and installed from clean. It's also exactly the class of bug that only running the full pipeline from a clean install (not testing components in isolation) was ever going to catch, which is the whole reason that run mattered even this late in the project.
+
+---
+
 ## Generator restarts silently invalidated everyone's profile
 
 **Date:** 2026-08-27

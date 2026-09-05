@@ -2,9 +2,9 @@
 
 See `ARCHITECTURE_AND_BUILD_PLAN.md` for the full design doc, data model, and phased build plan. See `BUILD_LOG.md` for a running record of bugs/issues hit while building and how they were fixed — good interview prep material.
 
-## Status: Phase 1 + 2 + 3 complete, Phase 4 in progress
+## Status: Phase 1-4 complete
 
-Transactions are generated, published to Redpanda, consumed, stored in Postgres, and run through the anomaly detection rules (rolling per-user profile, z-score / category-novelty / velocity checks). Flagged transactions are written to `flagged_events` and served by a FastAPI backend to a Streamlit dashboard (KPI tiles, a flag-volume-over-time chart, a top-triggered-rules chart, and a recent-flags table). Phase 4 (demo scenarios + polish) is underway — see "Demoing a specific scenario" and "Design trade-offs" below.
+Transactions are generated, published to Redpanda, consumed, stored in Postgres, and run through the anomaly detection rules (rolling per-user profile, z-score / category-novelty / velocity checks). Flagged transactions are written to `flagged_events` and served by a FastAPI backend to a Streamlit dashboard (KPI tiles, a flag-volume-over-time chart, a top-triggered-rules chart, and a recent-flags table). The full stack (Redpanda, Postgres, and all four processes) has been run together end to end and confirmed working — see "Demoing a specific scenario" and "Design trade-offs" below.
 
 ### Running it
 
@@ -73,9 +73,9 @@ It publishes through the same Kafka topic the generator uses — nothing bypasse
 
 **Phase 3:** all four API endpoints were exercised against real data produced by running many simulated users through the actual detection pipeline (not hand-written rows). The Streamlit dashboard was loaded in a real headless browser to confirm it renders the KPI tiles, both charts, and the table with correct values and no console/runtime errors, and was visually inspected via screenshot.
 
-See `BUILD_LOG.md` for real issues this testing caught across all three phases and how they were fixed — including a schema change prompted by the dashboard needing structured (not free-text) rule data, and a debounce fix for the velocity rule re-flagging every transaction during a busy stretch instead of just the one that crosses the threshold.
+**Phase 4:** the full stack — Redpanda, Postgres, the generator, the consumer, the FastAPI backend, and the Streamlit dashboard — was run together end to end for the first time, confirming a real transaction actually flows generator → Redpanda → consumer → Postgres → API → dashboard and shows up correctly on screen (including the demo scenario injector triggering a real flag on demand). This run caught two real bugs that isolated component testing had missed: the initial commit's `requirements.txt` and `.env.example` both still carried pre-fix values (an old `kafka-python` pin, and uncalibrated velocity thresholds) despite those exact fixes being made and documented earlier — see `BUILD_LOG.md` for both.
 
-Running the full Docker Compose stack (Redpanda + Postgres + all four processes together) still needs to be done on your machine, since it requires a Docker daemon — the build environment used here doesn't have one. Everything above was validated with Postgres running directly (no queue) and, for the generator/consumer, by feeding data through their real functions directly rather than through Kafka — see `BUILD_LOG.md`, Phase 1.
+See `BUILD_LOG.md` for the full record of issues this testing caught across all four phases and how they were fixed — including a schema change prompted by the dashboard needing structured (not free-text) rule data, a debounce fix for the velocity rule re-flagging every transaction during a busy stretch instead of just the one that crosses the threshold, and the two commit-vs-working-file gaps above.
 
 ## Design trade-offs
 

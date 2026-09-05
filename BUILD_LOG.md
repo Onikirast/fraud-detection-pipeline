@@ -6,6 +6,20 @@ Each entry: what broke, why, how it was fixed, and what it taught us. Newest ent
 
 ---
 
+## Gitignored .env kept reverting inside the OneDrive-synced folder
+
+**Date:** 2026-09-05
+
+**What broke:** After correcting `.env`'s velocity thresholds (1min/limit-8) and restarting the consumer, the dashboard still showed the old, uncalibrated "10 min (limit 5)" behavior. Re-checking `.env` directly showed it had silently reverted back to the stale values, with no edit made by hand.
+
+**Root cause:** `.env` is the one file in this project not tracked by git (`.gitignore` excludes it, correctly, since it can hold secrets) -- so unlike every other file, nothing was protecting it from being overwritten by a stale cached copy from OneDrive's cloud sync, which appears to have periodically re-synced an old local version back down over the corrected one.
+
+**Fix:** Rather than fight the sync behavior, exported the detection thresholds directly as shell environment variables from a small script kept outside the OneDrive folder entirely (in the WSL home directory), sourced before starting the consumer. `python-dotenv` never overrides a variable that's already set in the environment, so this takes priority over whatever `.env` says regardless of sync state. Confirmed working: `.env` still showed the stale values afterward, but the running consumer correctly used the exported ones.
+
+**Takeaway for interviews:** A real, non-obvious consequence of git-ignoring a config file inside a folder that's also under a different sync system. Git protects tracked files from silent reversion; a gitignored file inside a cloud-synced folder has no such protection from whatever else is touching that folder. Worth knowing before assuming "it's gitignored" means "it's safe from changing out from under you."
+
+---
+
 ## Committed requirements.txt never actually got the kafka-python fix
 
 **Date:** 2026-09-05

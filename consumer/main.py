@@ -44,8 +44,7 @@ TOPIC = os.getenv("KAFKA_TOPIC", "transactions")
 def insert_transaction(engine, txn: dict) -> bool:
     """Idempotent insert — if the same transaction id is delivered twice
     (e.g. after a consumer restart re-reads uncommitted offsets), this is a
-    no-op rather than a duplicate row or a crash. This is the kind of
-    at-least-once-delivery handling worth mentioning in an interview.
+    no-op rather than a duplicate row or a crash.
 
     Returns True if a new row was actually inserted, False if it was a
     duplicate. Detection only runs on real inserts — otherwise a redelivered

@@ -11,7 +11,14 @@ CREATE TABLE IF NOT EXISTS transactions (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions (user_id);
+-- Composite index matches the velocity rule's actual query shape (user_id
+-- AND a timestamp range) -- see consumer/detection.py's rule_velocity(),
+-- which runs this lookup on every single transaction. A standalone
+-- user_id index is redundant once this exists (Postgres can use a
+-- composite index's leftmost column alone), so it's dropped in favor of
+-- this rather than kept as unused write overhead. The standalone
+-- timestamp index stays: /stats/timeseries filters on timestamp alone.
+CREATE INDEX IF NOT EXISTS idx_transactions_user_id_timestamp ON transactions (user_id, "timestamp");
 CREATE INDEX IF NOT EXISTS idx_transactions_timestamp ON transactions ("timestamp");
 
 -- Rolling per-user profile, updated incrementally with Welford's online
@@ -35,3 +42,7 @@ CREATE TABLE IF NOT EXISTS flagged_events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_flagged_events_flagged_at ON flagged_events (flagged_at);
+-- Postgres doesn't auto-index foreign key columns; this is joined on in
+-- api/main.py's /flagged-events endpoint and demo/inject_scenario.py's
+-- polling query.
+CREATE INDEX IF NOT EXISTS idx_flagged_events_transaction_id ON flagged_events (transaction_id);

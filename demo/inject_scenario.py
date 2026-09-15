@@ -1,13 +1,12 @@
-"""Phase 4: on-demand attack-scenario injector for live demos / interviews.
+"""Phase 4: on-demand attack-scenario injector for live demos.
 
 The generator only injects anomalies ~5% of the time, at random, for a
-randomly chosen user -- great for realistic background noise, useless for
-"let me show you the detector catching something" five minutes into an
-interview. This script publishes ONE deliberately crafted scenario for a
-real, already-active user straight through the same Kafka topic the
-generator uses -- same queue, same consumer, same detection code, same
-dashboard. Nothing about the pipeline is bypassed; this is not a backdoor
-into the database.
+randomly chosen user -- great for realistic background noise, useless when
+you want to show the detector catching something right now. This script
+publishes ONE deliberately crafted scenario for a real, already-active user
+straight through the same Kafka topic the generator uses -- same queue,
+same consumer, same detection code, same dashboard. Nothing about the
+pipeline is bypassed; this is not a backdoor into the database.
 
 It reads the target user's ACTUAL current profile (mean_amount, m2_amount,
 common_categories) from `user_profiles` and reuses the detector's own

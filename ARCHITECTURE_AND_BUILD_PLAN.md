@@ -65,14 +65,10 @@ Build a small but real event-driven system that ingests a stream of transactions
 
 ## 4. Detection Approach (keep it simple and explainable)
 
-Resist the urge to reach for a full ML model — a transparent rule-based/statistical approach is *better* for this project because you can explain exactly why each decision was made. Start with:
-
 - **Z-score on amount:** flag if a transaction's amount is more than N standard deviations from that user's rolling mean (e.g., N=3).
 - **Category novelty:** flag if the merchant category has never (or rarely) appeared in that user's history.
 - **Velocity check:** flag if there are too many transactions from the same user in a short window (e.g., 5+ in 10 minutes) — classic card-testing fraud pattern.
 - **Combine into a score:** each rule contributes to a score; flag if the combined score crosses a threshold. This also gives a natural path for reducing false positives later — tuning per-rule weights and thresholds against labeled data.
-
-Stretch goal (optional, only if time allows): swap the z-score rule for an actual lightweight model like Isolation Forest from scikit-learn, and compare its flags against the rule-based ones — a direct, concrete way to weigh a rule-based approach against a model-based one.
 
 ## 5. Build Plan (suggested order)
 
@@ -93,7 +89,6 @@ Stretch goal (optional, only if time allows): swap the z-score rule for an actua
 **Phase 4 — Polish**
 9. Seed the generator with a few "attack scenarios" (a sudden high-value purchase, a burst of transactions, a new category) so detection can be demoed live.
 10. Write a short README explaining the architecture, the trade-offs made, and what would be done differently at scale.
-11. (Optional stretch) Add the Isolation Forest comparison from Section 4, or add horizontal scaling by running multiple consumer instances in the same Kafka consumer group and showing partition-based load distribution.
 
 ## 6. Key Design Rationale
 
@@ -102,7 +97,3 @@ Stretch goal (optional, only if time allows): swap the z-score rule for an actua
 - Rule-based vs. ML: explainability, no training data needed, easier to reason about false positives.
 - Scaling detection to many users: partitioning by `user_id` so all of one user's transactions land on the same consumer, keeping the rolling state simple.
 - Reducing false positives in production: threshold tuning, a human-in-the-loop review queue, feedback loop from confirmed fraud/not-fraud back into the rules.
-
-## 7. Estimated Timeline
-
-Roughly 1.5–2 weeks part-time: Phase 1 (2-3 days), Phase 2 (3-4 days), Phase 3 (2-3 days), Phase 4 (2-3 days, can be extended if you want the stretch goals).
